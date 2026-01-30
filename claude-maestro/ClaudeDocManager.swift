@@ -498,7 +498,9 @@ class ClaudeDocManager {
         setupOpenCodeContextFiles()
     }
 
-    /// Configure OpenCode global settings to read AGENTS.md and CLAUDE.md
+    /// Configure OpenCode global settings
+    /// Note: We don't set rules.file in global config as those are relative paths
+    /// that only make sense in project-specific .opencode/opencode.json
     private static func setupOpenCodeContextFiles() {
         let fm = FileManager.default
         let homeDir = fm.homeDirectoryForCurrentUser
@@ -519,26 +521,34 @@ class ClaudeDocManager {
                 config = json
             }
 
-            // Check if rules already configured
-            if let rules = config["rules"] as? [String: Any],
-               rules["file"] != nil {
-                return // Already configured
+            // Remove any incorrectly set rules.file from global config
+            // (relative file references don't work in global config)
+            if var rules = config["rules"] as? [String: Any] {
+                if let fileRules = rules["file"] as? [String],
+                   fileRules.contains(where: { $0.contains("./") }) {
+                    rules.removeValue(forKey: "file")
+                    if rules.isEmpty {
+                        config.removeValue(forKey: "rules")
+                    } else {
+                        config["rules"] = rules
+                    }
+                }
             }
 
-            // Add schema
-            config["$schema"] = "https://opencode.ai/config.json"
+            // Only write if we have changes or need to create the file
+            if !config.isEmpty || !fm.fileExists(atPath: configPath.path) {
+                // Add schema if not present
+                if config["$schema"] == nil {
+                    config["$schema"] = "https://opencode.ai/config.json"
+                }
 
-            // Configure rules to read AGENTS.md and CLAUDE.md
-            var rules = config["rules"] as? [String: Any] ?? [:]
-            rules["file"] = ["{file:./AGENTS.md}", "{file:./CLAUDE.md}"]
-            config["rules"] = rules
-
-            // Write config
-            if let jsonData = try? JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys]) {
-                try jsonData.write(to: configPath)
+                // Write config
+                if let jsonData = try? JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys]) {
+                    try jsonData.write(to: configPath)
+                }
             }
         } catch {
-            print("Failed to configure OpenCode context files: \(error)")
+            print("Failed to configure OpenCode: \(error)")
         }
     }
 
@@ -1300,10 +1310,8 @@ class ClaudeDocManager {
             // Set MCP configuration
             config["mcp"] = mcpConfig
 
-            // Configure OpenCode to read AGENTS.md and CLAUDE.md
-            var rules = config["rules"] as? [String: Any] ?? [:]
-            rules["file"] = ["{file:./AGENTS.md}", "{file:./CLAUDE.md}"]
-            config["rules"] = rules
+            // Note: OpenCode automatically loads CLAUDE.md from its default contextPaths
+            // No need to configure contextPaths in project-level config
 
             // Write config
             if let jsonData = try? JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys]) {
