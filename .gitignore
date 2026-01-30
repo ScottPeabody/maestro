@@ -14,3 +14,6 @@ claude.md
 
 # Local MCP configuration (contains machine-specific paths)
 .mcp.json
+
+# macOS
+.DS_Store
