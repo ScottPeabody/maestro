@@ -15,6 +15,7 @@ enum TerminalMode: String, CaseIterable, Codable {
     case claudeCode = "Claude Code"
     case geminiCli = "Gemini CLI"
     case openAiCodex = "OpenAI Codex"
+    case openCode = "OpenCode"
     case plainTerminal = "Plain Terminal"
 
     var icon: String {
@@ -22,6 +23,7 @@ enum TerminalMode: String, CaseIterable, Codable {
         case .claudeCode: return "brain"
         case .geminiCli: return "sparkles"
         case .openAiCodex: return "cpu"
+        case .openCode: return "chevron.left.forwardslash.chevron.right"
         case .plainTerminal: return "terminal"
         }
     }
@@ -31,6 +33,7 @@ enum TerminalMode: String, CaseIterable, Codable {
         case .claudeCode: return .purple
         case .geminiCli: return .blue
         case .openAiCodex: return .green
+        case .openCode: return .orange
         case .plainTerminal: return .gray
         }
     }
@@ -40,6 +43,7 @@ enum TerminalMode: String, CaseIterable, Codable {
         case .claudeCode: return "claude"
         case .geminiCli: return "gemini"
         case .openAiCodex: return "codex"
+        case .openCode: return "opencode"
         case .plainTerminal: return nil
         }
     }
@@ -50,6 +54,7 @@ enum TerminalMode: String, CaseIterable, Codable {
         case .claudeCode: return "claude"
         case .geminiCli: return "gemini"
         case .openAiCodex: return "codex"
+        case .openCode: return "opencode"
         case .plainTerminal: return nil
         }
     }
@@ -104,6 +109,7 @@ enum TerminalMode: String, CaseIterable, Codable {
         case .claudeCode: return "npm install -g @anthropic-ai/claude-code"
         case .geminiCli: return "npm install -g @google/gemini-cli"
         case .openAiCodex: return "npm install -g @openai/codex"
+        case .openCode: return "curl -fsSL https://opencode.ai/install | bash"
         case .plainTerminal: return ""
         }
     }

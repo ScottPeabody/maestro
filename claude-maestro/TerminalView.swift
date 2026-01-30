@@ -190,6 +190,7 @@ struct EmbeddedTerminalView: NSViewRepresentable {
         Coordinator(
             sessionId: sessionId,
             mode: mode,
+            workingDirectory: workingDirectory,
             status: $status,
             activityMonitor: activityMonitor,
             onServerReady: onServerReady,
@@ -301,6 +302,7 @@ struct EmbeddedTerminalView: NSViewRepresentable {
     class Coordinator: NSObject, LocalProcessTerminalViewDelegate {
         let sessionId: Int
         let mode: TerminalMode
+        let workingDirectory: String
         @Binding var status: SessionStatus
         var hasLaunched = false
         private var outputBuffer = ""
@@ -326,9 +328,10 @@ struct EmbeddedTerminalView: NSViewRepresentable {
         private let initializingTimeout: TimeInterval = 3.0  // Time after launch before assuming idle
         private let idleTimeout: TimeInterval = 2.0          // Time without output = idle
 
-        init(sessionId: Int, mode: TerminalMode, status: Binding<SessionStatus>, activityMonitor: ProcessActivityMonitor?, onServerReady: ((String) -> Void)?, onOutputReceived: ((String) -> Void)?) {
+        init(sessionId: Int, mode: TerminalMode, workingDirectory: String, status: Binding<SessionStatus>, activityMonitor: ProcessActivityMonitor?, onServerReady: ((String) -> Void)?, onOutputReceived: ((String) -> Void)?) {
             self.sessionId = sessionId
             self.mode = mode
+            self.workingDirectory = workingDirectory
             self._status = status
             self.activityMonitor = activityMonitor
             self.onServerReady = onServerReady
@@ -359,6 +362,14 @@ struct EmbeddedTerminalView: NSViewRepresentable {
             if mode == .openAiCodex {
                 Task { @MainActor in
                     ClaudeDocManager.cleanupCodexMCPConfig(sessionId: sessionId)
+                }
+            }
+
+            // Clean up OpenCode config if this was an OpenCode session
+            if mode == .openCode {
+                let workDir = workingDirectory
+                Task { @MainActor in
+                    ClaudeDocManager.cleanupOpenCodeConfig(sessionId: sessionId, directory: workDir)
                 }
             }
 

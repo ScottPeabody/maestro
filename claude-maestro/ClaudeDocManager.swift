@@ -491,10 +491,55 @@ class ClaudeDocManager {
         case remove
     }
 
-    /// One-time setup: Configure Codex and Gemini CLI to read CLAUDE.md
+    /// One-time setup: Configure Codex, Gemini CLI, and OpenCode to read context files
     static func setupCLIContextFiles() {
         setupCodexFallbackFilenames()
         setupGeminiContextFileName()
+        setupOpenCodeContextFiles()
+    }
+
+    /// Configure OpenCode global settings to read AGENTS.md and CLAUDE.md
+    private static func setupOpenCodeContextFiles() {
+        let fm = FileManager.default
+        let homeDir = fm.homeDirectoryForCurrentUser
+        let openCodeDir = homeDir.appendingPathComponent(".config/opencode")
+        let configPath = openCodeDir.appendingPathComponent("opencode.json")
+
+        do {
+            // Create .config/opencode directory if it doesn't exist
+            if !fm.fileExists(atPath: openCodeDir.path) {
+                try fm.createDirectory(at: openCodeDir, withIntermediateDirectories: true)
+            }
+
+            // Read existing config or start fresh
+            var config: [String: Any] = [:]
+            if fm.fileExists(atPath: configPath.path),
+               let data = try? Data(contentsOf: configPath),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                config = json
+            }
+
+            // Check if rules already configured
+            if let rules = config["rules"] as? [String: Any],
+               rules["file"] != nil {
+                return // Already configured
+            }
+
+            // Add schema
+            config["$schema"] = "https://opencode.ai/config.json"
+
+            // Configure rules to read AGENTS.md and CLAUDE.md
+            var rules = config["rules"] as? [String: Any] ?? [:]
+            rules["file"] = ["{file:./AGENTS.md}", "{file:./CLAUDE.md}"]
+            config["rules"] = rules
+
+            // Write config
+            if let jsonData = try? JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys]) {
+                try jsonData.write(to: configPath)
+            }
+        } catch {
+            print("Failed to configure OpenCode context files: \(error)")
+        }
     }
 
     /// Configure Codex to read CLAUDE.md as fallback context file
@@ -983,6 +1028,313 @@ class ClaudeDocManager {
 
         case .plainTerminal:
             break // No MCP config needed
+
+        case .openCode:
+            // Write AGENTS.md (OpenCode's primary context file)
+            writeAgentsMD(
+                to: directory,
+                projectPath: projectPath,
+                branch: branch,
+                sessionId: sessionId,
+                port: port,
+                mainRepoClaudeMD: mainRepoClaudeMD,
+                skillsSection: skillsSection
+            )
+            // Write opencode.json with MCP configuration
+            writeOpenCodeConfig(to: directory, sessionId: sessionId, projectPath: projectPath)
+        }
+    }
+
+    // MARK: - OpenCode Support
+
+    /// Generate AGENTS.md content for OpenCode
+    static func generateAgentsMDContent(
+        projectPath: String,
+        runCommand: String?,
+        branch: String?,
+        sessionId: Int,
+        port: Int?,
+        mcpServerPath: String? = nil,
+        mainRepoClaudeMD: String? = nil,
+        skillsSection: String? = nil
+    ) -> String {
+        var content = """
+        # Project Context
+
+        This file provides context for OpenCode and other AI coding agents working in this repository.
+
+        ## Project Information
+
+        - **Path:** \(projectPath)
+        """
+
+        if let branch = branch {
+            content += "\n- **Branch:** \(branch)"
+        }
+
+        content += "\n- **Session ID:** \(sessionId)"
+
+        if let port = port {
+            content += "\n- **Assigned Port:** \(port)"
+        }
+
+        // Add run command section
+        if let runCmd = runCommand {
+            content += """
+
+
+        ## Development Commands
+
+        - **Run/Start:** `\(runCmd)`
+        """
+        } else {
+            content += """
+
+
+        ## Development Commands
+
+        No run command detected. Use the `detect_project_type` MCP tool to auto-detect the run command.
+        """
+        }
+
+        // Add MCP Server Integration section
+        if mcpServerPath != nil {
+            content += """
+
+
+        ## MCP Server Integration
+
+        This session is connected to Claude Maestro's process management server.
+
+        ### Available MCP Tools
+
+        Use these tools to manage your development server:
+
+        - `start_dev_server` - Start the dev server for this project
+        - `stop_dev_server` - Stop the running dev server
+        - `get_server_status` - Check if dev server is running
+        - `detect_project_type` - Auto-detect project type and run command
+        - `get_server_logs` - Retrieve recent server output
+
+        ### Usage Example
+
+        When asked to run the dev server, use the MCP tools:
+        1. First detect the project type if run command is unknown
+        2. Use `start_dev_server` to launch the server
+        3. Monitor with `get_server_status` and `get_server_logs`
+        """
+        }
+
+        // Add skills section if provided
+        if let skills = skillsSection, !skills.isEmpty {
+            content += skills
+        }
+
+        content += """
+
+
+        ## Session Notes
+
+        This worktree is managed by Claude Maestro. Changes made here are isolated
+        from other sessions working on different branches.
+
+        ---
+        *Auto-generated by Claude Maestro*
+        """
+
+        // Append main repo context if provided
+        if let mainContent = mainRepoClaudeMD, !mainContent.isEmpty {
+            content += """
+
+
+        ---
+
+        ## Project Context (from main repository)
+
+        \(mainContent)
+        """
+        }
+
+        return content
+    }
+
+    /// Write AGENTS.md to the specified directory for OpenCode
+    static func writeAgentsMD(
+        to directory: String,
+        projectPath: String,
+        branch: String?,
+        sessionId: Int,
+        port: Int?,
+        mainRepoClaudeMD: String?,
+        skillsSection: String?
+    ) {
+        let mcpServerPath = MCPServerManager.shared.getServerPath()
+        let effectiveRunCommand = detectRunCommand(for: directory)
+
+        let content = generateAgentsMDContent(
+            projectPath: projectPath,
+            runCommand: effectiveRunCommand,
+            branch: branch,
+            sessionId: sessionId,
+            port: port,
+            mcpServerPath: mcpServerPath,
+            mainRepoClaudeMD: mainRepoClaudeMD,
+            skillsSection: skillsSection
+        )
+
+        let filePath = URL(fileURLWithPath: directory).appendingPathComponent("AGENTS.md")
+
+        do {
+            try content.write(to: filePath, atomically: true, encoding: .utf8)
+        } catch {
+            print("Failed to generate AGENTS.md: \(error)")
+        }
+    }
+
+    /// Generate OpenCode MCP configuration for opencode.json
+    static func generateOpenCodeMCPConfig(
+        sessionId: Int,
+        maestroServerPath: String?,
+        customServers: [MCPServerConfig],
+        pluginMCPServers: [String: Any] = [:],
+        projectPath: String? = nil,
+        portRangeStart: Int = 3000,
+        portRangeEnd: Int = 3099
+    ) -> [String: Any] {
+        var mcpConfig: [String: Any] = [:]
+
+        // Add Maestro MCP if available
+        if let maestroPath = maestroServerPath {
+            mcpConfig["maestro"] = [
+                "type": "local",
+                "command": [maestroPath],
+                "environment": [
+                    "MAESTRO_SESSION_ID": "\(sessionId)",
+                    "MAESTRO_PORT_RANGE_START": "\(portRangeStart)",
+                    "MAESTRO_PORT_RANGE_END": "\(portRangeEnd)"
+                ],
+                "enabled": true
+            ] as [String: Any]
+        }
+
+        // Add custom MCP servers
+        for server in customServers {
+            var config: [String: Any] = [
+                "type": "local",
+                "command": [server.command] + server.args,
+                "enabled": true
+            ]
+            if !server.env.isEmpty {
+                config["environment"] = server.env
+            }
+            mcpConfig[server.mcpKey] = config
+        }
+
+        // Add plugin MCP servers (convert format if needed)
+        for (key, value) in pluginMCPServers {
+            if let serverConfig = value as? [String: Any] {
+                var config: [String: Any] = ["type": "local", "enabled": true]
+
+                // Convert from Claude format to OpenCode format
+                if let command = serverConfig["command"] as? String {
+                    var cmdArray = [command]
+                    if let args = serverConfig["args"] as? [String] {
+                        cmdArray += args
+                    }
+                    config["command"] = cmdArray
+                }
+                if let env = serverConfig["env"] as? [String: String] {
+                    config["environment"] = env
+                }
+
+                mcpConfig[key] = config
+            }
+        }
+
+        return mcpConfig
+    }
+
+    /// Write opencode.json to .opencode/ directory
+    @MainActor
+    static func writeOpenCodeConfig(to directory: String, sessionId: Int, projectPath: String? = nil) {
+        let fm = FileManager.default
+        let openCodeDir = URL(fileURLWithPath: directory).appendingPathComponent(".opencode")
+        let configPath = openCodeDir.appendingPathComponent("opencode.json")
+
+        let mcpManager = MCPServerManager.shared
+        let sessionConfig = mcpManager.getMCPConfig(for: sessionId)
+
+        // Get Maestro path if enabled
+        let maestroPath = sessionConfig.maestroEnabled ? mcpManager.getServerPath() : nil
+        let enabledServers = mcpManager.enabledServers(for: sessionId)
+
+        // Get enabled plugins and collect their MCP server configs
+        let pluginMCPServers = collectPluginMCPServers(for: sessionId)
+
+        // Generate MCP configuration
+        let mcpConfig = generateOpenCodeMCPConfig(
+            sessionId: sessionId,
+            maestroServerPath: maestroPath,
+            customServers: enabledServers,
+            pluginMCPServers: pluginMCPServers,
+            projectPath: projectPath
+        )
+
+        do {
+            // Create .opencode directory if needed
+            if !fm.fileExists(atPath: openCodeDir.path) {
+                try fm.createDirectory(at: openCodeDir, withIntermediateDirectories: true)
+            }
+
+            // Read existing config or start fresh
+            var config: [String: Any] = [:]
+            if fm.fileExists(atPath: configPath.path),
+               let data = try? Data(contentsOf: configPath),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                config = json
+            }
+
+            // Add schema for IDE support
+            config["$schema"] = "https://opencode.ai/config.json"
+
+            // Set MCP configuration
+            config["mcp"] = mcpConfig
+
+            // Configure OpenCode to read AGENTS.md and CLAUDE.md
+            var rules = config["rules"] as? [String: Any] ?? [:]
+            rules["file"] = ["{file:./AGENTS.md}", "{file:./CLAUDE.md}"]
+            config["rules"] = rules
+
+            // Write config
+            if let jsonData = try? JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys]) {
+                try jsonData.write(to: configPath)
+            }
+        } catch {
+            print("Failed to write OpenCode config: \(error)")
+        }
+    }
+
+    /// Clean up OpenCode config when session closes
+    @MainActor
+    static func cleanupOpenCodeConfig(sessionId: Int, directory: String) {
+        let fm = FileManager.default
+        let openCodeDir = URL(fileURLWithPath: directory).appendingPathComponent(".opencode")
+        let configPath = openCodeDir.appendingPathComponent("opencode.json")
+
+        guard fm.fileExists(atPath: configPath.path),
+              let data = try? Data(contentsOf: configPath),
+              var config = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return
+        }
+
+        // Remove Maestro MCP from config
+        if var mcp = config["mcp"] as? [String: Any] {
+            mcp.removeValue(forKey: "maestro")
+            config["mcp"] = mcp
+
+            if let jsonData = try? JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys]) {
+                try? jsonData.write(to: configPath)
+            }
         }
     }
 

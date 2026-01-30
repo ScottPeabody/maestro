@@ -322,6 +322,7 @@ struct StatusOverviewView: View {
         case .geminiCli: return "Gemini"
         case .openAiCodex: return "Codex"
         case .plainTerminal: return "Terminal"
+        case .openCode: return "OpenCode"
         }
     }
 }

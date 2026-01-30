@@ -77,6 +77,7 @@ struct ModeButton: View {
         case .claudeCode: return "Claude"
         case .geminiCli: return "Gemini"
         case .openAiCodex: return "Codex"
+        case .openCode: return "OpenCode"
         case .plainTerminal: return "Terminal"
         }
     }

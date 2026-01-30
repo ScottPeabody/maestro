@@ -89,6 +89,7 @@ struct PresetSelector: View {
             case .geminiCli: shortName = "Gemini"
             case .openAiCodex: shortName = "Codex"
             case .plainTerminal: shortName = "Terminal"
+            case .openCode: shortName = "OpenCode"
             }
             return "\(sessions.count) \(shortName)"
         }

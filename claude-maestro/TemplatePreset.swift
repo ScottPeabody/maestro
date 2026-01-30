@@ -48,6 +48,7 @@ struct TemplatePreset: Codable, Identifiable, Hashable {
             case .geminiCli: shortName = "Gemini"
             case .openAiCodex: shortName = "Codex"
             case .plainTerminal: shortName = "Terminal"
+            case .openCode: shortName = "OpenCode"
             }
             return "\(sessions.count) \(shortName)"
         }
@@ -67,6 +68,7 @@ struct TemplatePreset: Codable, Identifiable, Hashable {
         case .geminiCli: shortName = "Gemini"
         case .openAiCodex: shortName = "Codex"
         case .plainTerminal: shortName = "Terminal"
+        case .openCode: shortName = "OpenCode"
         }
 
         return TemplatePreset(
@@ -75,17 +77,19 @@ struct TemplatePreset: Codable, Identifiable, Hashable {
         )
     }
 
-    static func mixed(claude: Int = 0, gemini: Int = 0, codex: Int = 0, plain: Int = 0) -> TemplatePreset {
+    static func mixed(claude: Int = 0, gemini: Int = 0, codex: Int = 0, opencode: Int = 0, plain: Int = 0) -> TemplatePreset {
         var configs: [SessionConfiguration] = []
         configs += (0..<claude).map { _ in SessionConfiguration(mode: .claudeCode) }
         configs += (0..<gemini).map { _ in SessionConfiguration(mode: .geminiCli) }
         configs += (0..<codex).map { _ in SessionConfiguration(mode: .openAiCodex) }
+        configs += (0..<opencode).map { _ in SessionConfiguration(mode: .openCode) }
         configs += (0..<plain).map { _ in SessionConfiguration(mode: .plainTerminal) }
 
         let nameParts = [
             claude > 0 ? "\(claude) Claude" : nil,
             gemini > 0 ? "\(gemini) Gemini" : nil,
             codex > 0 ? "\(codex) Codex" : nil,
+            opencode > 0 ? "\(opencode) OpenCode" : nil,
             plain > 0 ? "\(plain) Terminal" : nil
         ].compactMap { $0 }
 
@@ -102,7 +106,10 @@ extension TemplatePreset {
     static let quickPresets: [TemplatePreset] = [
         .allSameMode(count: 4, mode: .claudeCode),
         .allSameMode(count: 6, mode: .claudeCode),
+        .allSameMode(count: 4, mode: .openCode),
+        .allSameMode(count: 6, mode: .openCode),
         .mixed(claude: 3, gemini: 2, plain: 1),
         .mixed(claude: 2, gemini: 2, codex: 2),
+        .mixed(claude: 2, gemini: 1, opencode: 2),
     ]
 }

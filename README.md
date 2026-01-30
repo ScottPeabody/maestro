@@ -91,6 +91,7 @@ A native macOS application that lets you run 1-12 Claude Code (or other AI CLI) 
 - **Claude Code** - Anthropic's Claude in the terminal
 - **Gemini CLI** - Google's Gemini AI
 - **OpenAI Codex** - OpenAI's coding assistant
+- **OpenCode** - Open source AI coding agent
 - **Plain Terminal** - Standard shell without AI
 
 ### Plugin Marketplace
@@ -186,6 +187,11 @@ npm install -g @google/gemini-cli
 
 # OpenAI Codex
 npm install -g @openai/codex
+
+# OpenCode
+curl -fsSL https://opencode.ai/install | bash
+# Or via package managers: npm, Homebrew, etc.
+# See https://opencode.ai/docs for more options
 ```
 
 ---

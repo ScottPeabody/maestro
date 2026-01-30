@@ -466,6 +466,7 @@ struct AgentProcessRow: View {
         case .geminiCli: return "Gemini"
         case .openAiCodex: return "Codex"
         case .plainTerminal: return "Shell"
+        case .openCode: return "OpenCode"
         }
     }
 }
